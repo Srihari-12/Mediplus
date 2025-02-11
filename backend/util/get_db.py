@@ -1,5 +1,6 @@
 from fastapi import Depends
-from config.db import SessionLocal
+from sqlalchemy.orm import Session  
+from config.db import SessionLocal 
 
 
 def get_db():
@@ -8,5 +9,3 @@ def get_db():
         yield db
     finally:
         db.close()
-
-db_dependency = Depends(get_db)
