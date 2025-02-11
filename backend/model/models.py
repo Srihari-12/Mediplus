@@ -30,24 +30,10 @@ class User(Base):
         unique=True,
         index=True,
     )
-
-    
     role = Column(SqlEnum(RoleEnum, name="role_enum"), default=RoleEnum.patient)  
-
-    
     name = Column(String(255), index=True)  
-
-    
     email = Column(String(255), unique=True, index=True) 
-
-    
     hospital_name = Column(String(255), nullable=True) 
-
-    
     password = Column(String(255)) 
-
-    
     verified = Column(Boolean, default=False)
-
-    
     created_at = Column(DateTime, default=datetime.now)
