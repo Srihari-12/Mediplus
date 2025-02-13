@@ -40,8 +40,9 @@ async def create_user(create_user_request: UserCreate, db: Session = Depends(get
         email=create_user_request.email,
         password=hashed_password,
         name=create_user_request.name,
-        role=create_user_request.role  # Ensure correct field names
-    )
+        role=create_user_request.role,
+        hospital_name=create_user_request.hospital_name,
+ )
 
     # ✅ Save to Database
     db.add(new_user)
