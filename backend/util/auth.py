@@ -30,7 +30,7 @@ async def create_user(create_user_request: UserCreate, db: Session = Depends(get
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == create_user_request.email).first()
     if existing_user:
-        raise HTTPException(status_code=400, detail=" User with this email already exists")
+        raise HTTPException(status_code=400, detail="User with this email already exists")
 
     # Hash Password
     hashed_password = bcrypt_context.hash(create_user_request.password)
