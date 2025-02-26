@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from util.get_db import get_db  # ✅ Ensure correct import path
 from schemas.user_schema import UserCreate, UserResponse, Token
-from model.models import User, RoleEnum
+from model.user_model import User, RoleEnum, genreate_user_id
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
-from model.models import genreate_user_id
+
 
 router = APIRouter(tags=["Auth"], prefix="/auth")
 

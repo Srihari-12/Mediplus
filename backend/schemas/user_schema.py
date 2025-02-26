@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import declarative_base
-from model.models import RoleEnum
+from model.user_model import RoleEnum
 
 Base = declarative_base()
 

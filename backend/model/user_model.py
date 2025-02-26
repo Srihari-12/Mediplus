@@ -43,10 +43,10 @@ class User(Base):
 
     
 
-# Function to generate user id
+
 def genreate_user_id(db):
     last_user_id = db.query(User).order_by(User.user_id.desc()).first()
     if last_user_id and last_user_id.user_id<9999:
         return last_user_id.user_id + 1
-    return 1000
+
 
