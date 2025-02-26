@@ -7,6 +7,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
+from model.models import genreate_user_id
 
 router = APIRouter(tags=["Auth"], prefix="/auth")
 
@@ -43,6 +44,7 @@ async def create_user(create_user_request: UserCreate, db: Session = Depends(get
         role=create_user_request.role,
         hospital_name=create_user_request.hospital_name,
  )
+    new_user.user_id = genreate_user_id(db)
 
     # ✅ Save to Database
     db.add(new_user)

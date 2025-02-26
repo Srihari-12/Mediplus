@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Integer,
     String,
     Boolean,
     DateTime,
@@ -30,6 +31,7 @@ class User(Base):
         unique=True,
         index=True,
     )
+    user_id = Column(Integer, unique=True, nullable=False)
     role = Column(SqlEnum(RoleEnum, name="role_enum"), default=RoleEnum.patient)  
     name = Column(String(255), index=True)  
     email = Column(String(255), unique=True, index=True) 
@@ -37,3 +39,14 @@ class User(Base):
     password = Column(String(255)) 
     verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
+
+
+    
+
+# Function to generate user id
+def genreate_user_id(db):
+    last_user_id = db.query(User).order_by(User.user_id.desc()).first()
+    if last_user_id and last_user_id.user_id<9999:
+        return last_user_id.user_id + 1
+    return 1000
+
