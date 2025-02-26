@@ -1,6 +1,6 @@
 from typing import List, Optional
 import logging  # Ensure logging is imported
-from model.models import User, RoleEnum
+from model.user_model import User, RoleEnum
 
 from util.get_db import db_dependency
 from schemas.user_schema import UserCreate, UserResponse, UserUpdate

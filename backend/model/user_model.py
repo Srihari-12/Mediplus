@@ -6,24 +6,22 @@ from sqlalchemy import (
     DateTime,
     Enum as SqlEnum,  
 )
-from datetime import datetime
 from sqlalchemy.orm import relationship
 from config.db import Base  
 from enum import Enum as PyEnum  
+from datetime import datetime
 import uuid
 
-# user roles
+# User roles
 class RoleEnum(PyEnum):
     patient = "patient"
     doctor = "doctor"
     pharmacist = "pharmacist"
     admin = "admin"
 
-# User model 
 class User(Base):
     __tablename__ = "users"
     
-    # Unique identifier 
     id = Column(
         String(36),  
         primary_key=True,
@@ -40,13 +38,13 @@ class User(Base):
     verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
 
+    # ✅ Separate relationships for doctor and patient
+    prescriptions_as_doctor = relationship("Prescription", back_populates="doctor", foreign_keys="Prescription.doctor_id")
+    prescriptions_as_patient = relationship("Prescription", back_populates="patient", foreign_keys="Prescription.patient_user_id")
 
-    
-
-
-def genreate_user_id(db):
-    last_user_id = db.query(User).order_by(User.user_id.desc()).first()
-    if last_user_id and last_user_id.user_id<9999:
-        return last_user_id.user_id + 1
-
-
+# Function to generate a unique 3-digit user_id for new patients
+def generate_user_id(db):
+    last_user = db.query(User).order_by(User.user_id.desc()).first()
+    if last_user and last_user.user_id < 999:
+        return last_user.user_id + 1
+    return 100  # Start from 100 if no users exist
