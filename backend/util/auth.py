@@ -15,7 +15,7 @@ oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/token")
 # Authentication Settings
 SECRET_KEY = "94cf4fdf6a939c09444e630c14ca9b74f542559f5a16cee9580fdf22f10b4866"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 120 
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

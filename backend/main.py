@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from util import auth 
 from v1.endpoints import prescription
+from v1.endpoints import pharmacy
 from config.db import create_tables
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
 
@@ -13,7 +15,13 @@ async def read_health():
 app.include_router(prescription.router)
 
 
-
-
+app.include_router(pharmacy.router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Replace with frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods (POST, GET, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 create_tables()

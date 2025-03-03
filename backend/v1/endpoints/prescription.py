@@ -1,5 +1,7 @@
 import os
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from util.get_db import get_db
@@ -7,8 +9,6 @@ from model.user_model import User, RoleEnum
 from model.prescription_model import Prescription
 from schemas.prescription_schema import PrescriptionResponse
 from util.auth import oauth2_bearer, SECRET_KEY, ALGORITHM
-import uuid
-from fastapi.responses import FileResponse
 
 router = APIRouter(tags=["Prescriptions"], prefix="/prescriptions")
 
@@ -16,19 +16,21 @@ router = APIRouter(tags=["Prescriptions"], prefix="/prescriptions")
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ✅ Extract logged-in doctor from JWT token
+
+
 def get_current_doctor(token: str = Depends(oauth2_bearer), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
-        user = db.query(User).filter(User.email == email).first()
-        if not user or user.role != RoleEnum.doctor:
+        doctor = db.query(User).filter(User.email == email).first()
+
+        if not doctor or doctor.role != RoleEnum.doctor:
             raise HTTPException(status_code=403, detail="Only doctors can upload prescriptions")
-        return user
+        return doctor
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# ✅ Doctors upload prescriptions (Authenticated)
+
 @router.post("/", response_model=PrescriptionResponse, status_code=status.HTTP_201_CREATED)
 async def upload_prescription(
     patient_name: str, patient_user_id: int, file: UploadFile = File(...), 
@@ -51,9 +53,13 @@ async def upload_prescription(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
+    # ✅ Check if doctor's name is fetched correctly
+    print(f"Uploading Prescription - Doctor Name: {doctor.name}, Doctor ID: {doctor.id}")
+
     # Save prescription details to database
     new_prescription = Prescription(
         doctor_id=doctor.id,  # Extracted from JWT
+        doctor_name=doctor.name,  # ✅ Save the doctor's name permanently
         patient_name=patient.name,
         patient_user_id=patient.user_id,
         file_path=file_path
@@ -65,32 +71,35 @@ async def upload_prescription(
     return new_prescription
 
 
-    # ✅ Extract logged-in patient from JWT token
 def get_current_patient(token: str = Depends(oauth2_bearer), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
-        user = db.query(User).filter(User.email == email).first()
-        if not user or user.role != RoleEnum.patient:
+        patient = db.query(User).filter(User.email == email).first()
+
+        if not patient or patient.role != RoleEnum.patient:
             raise HTTPException(status_code=403, detail="Only patients can view prescriptions")
-        return user
+        return patient
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# ✅ Patients can view their prescriptions (Authenticated)
+
+
 @router.get("/", response_model=list[PrescriptionResponse])
 async def get_prescriptions(patient: User = Depends(get_current_patient), db: Session = Depends(get_db)):
     prescriptions = db.query(Prescription).filter(Prescription.patient_user_id == patient.user_id).all()
-    
+
     if not prescriptions:
         raise HTTPException(status_code=404, detail="No prescriptions found for this patient")
 
     return prescriptions
-    
+
+
+
 @router.get("/view/{prescription_id}")
 async def view_prescription(
-    prescription_id: str, 
-    patient: str = Depends(get_current_patient),
+    prescription_id: str,
+    patient: User = Depends(get_current_patient),
     db: Session = Depends(get_db)
 ):
     # Fetch the prescription from the database

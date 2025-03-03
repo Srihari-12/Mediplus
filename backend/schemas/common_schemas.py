@@ -16,3 +16,4 @@ class LogoutResponse(BaseModel):
     status_code: int
     detail: str
     last_login: datetime
+
