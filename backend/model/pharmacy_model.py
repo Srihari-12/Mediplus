@@ -1,0 +1,28 @@
+from sqlalchemy import Column, String, Integer, ForeignKey, Enum, DateTime
+from sqlalchemy.orm import relationship
+from config.db import Base
+import uuid
+from datetime import datetime
+from enum import Enum as PyEnum  
+
+# ✅ Correct Enum Declaration
+class OrderStatusEnum(str, PyEnum):
+    pending = "pending"
+    processed = "processed"
+    picked_up = "picked_up"
+
+class PharmacyPrescription(Base):
+    __tablename__ = "pharmacy_prescriptions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    prescription_id = Column(String(36), ForeignKey("prescriptions.id", ondelete="CASCADE"), nullable=False)
+    patient_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    pharmacist_id = Column(Integer, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+
+    # ✅ Ensure `Enum` has explicit name
+    status = Column(Enum(OrderStatusEnum, name="order_status_enum"), default=OrderStatusEnum.pending, nullable=False)
+    otp_code = Column(String(6), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # ✅ Relationship to Prescription
+    prescription = relationship("Prescription", back_populates="pharmacy_orders")
