@@ -9,6 +9,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel
 
 router = APIRouter(tags=["Auth"], prefix="/auth")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/token")
@@ -25,6 +26,33 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     expire = datetime.utcnow() + (expires_delta if expires_delta else timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(token : str = Depends(oauth2_bearer),db : Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"})
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+class UserInfo(BaseModel):
+    email: str
+    name: str
+    role: RoleEnum
+    user_id: int
+
+@router.get("/me", response_model=UserInfo)
+def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 # ✅ User Registration Endpoint
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
@@ -69,3 +97,5 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(data={"sub": user.email})
 
     return {"access_token": access_token, "token_type": "bearer"}
+
+

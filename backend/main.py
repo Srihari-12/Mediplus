@@ -4,6 +4,8 @@ from v1.endpoints import prescription
 from v1.endpoints import pharmacy
 from config.db import create_tables
 from fastapi.middleware.cors import CORSMiddleware
+from v1.endpoints import inventory
+from v1.endpoints import analytics
 app = FastAPI()
 
 
@@ -12,9 +14,15 @@ app.include_router(auth.router)
 async def read_health():
     return {"status": "OK"}
 
+app.include_router(inventory.router)
+
+@app.get("/chumma")
+async def read_health():
+    return {"chumma": "🙃"}
+
 app.include_router(prescription.router)
 
-
+app.include_router(analytics.router)
 app.include_router(pharmacy.router)
 app.add_middleware(
     CORSMiddleware,

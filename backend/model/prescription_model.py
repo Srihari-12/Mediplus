@@ -9,11 +9,12 @@ class Prescription(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     doctor_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # ✅ Allows doctor deletion
-    doctor_name = Column(String(255), nullable=False)  # ✅ Stores doctor's name even after deletion
+    doctor_name = Column(String(255), nullable=False)
     patient_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)  # ✅ Patient ForeignKey
     patient_name = Column(String(255), nullable=False)
     file_path = Column(String(255), nullable=False)
-    created_at = Column(String, nullable=False)  
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
     
 
