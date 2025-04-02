@@ -16,9 +16,6 @@ MediPlus is a digital prescription management system that enables doctors to upl
 
 ### Frontend
 - React.js (Vite)
-- Zustand for state management
-- React Router DOM
-- Axios
 
 ### Backend
 - FastAPI
