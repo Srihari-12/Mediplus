@@ -7,7 +7,6 @@ import {
   Paper,
   CircularProgress,
   Grid,
-  InputLabel,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 
@@ -32,23 +31,23 @@ const DoctorPortal = () => {
     setSearched(true);
 
     try {
-      const res = await fetch(`http://localhost:8000/prescriptions?name=${patientName}&user_id=${patientId}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch(
+        `http://localhost:8000/prescriptions?name=${patientName}&user_id=${patientId}`,
+        {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
         setPrescriptions(data);
       } else {
-        const err = await res.json();
-        console.error(err.detail);
         setPrescriptions([]);
       }
     } catch (err) {
       console.error('Fetch error:', err);
+      setPrescriptions([]);
     } finally {
       setLoading(false);
     }
@@ -68,9 +67,7 @@ const DoctorPortal = () => {
     try {
       const res = await fetch('http://localhost:8000/prescriptions', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -78,7 +75,7 @@ const DoctorPortal = () => {
 
       if (res.ok) {
         alert('Prescription uploaded successfully!');
-        setPrescriptions((prev) => [data, ...prev]); // update list
+        setPrescriptions((prev) => [data, ...prev]);
         setFile(null);
       } else {
         alert(data.detail || 'Upload failed');
@@ -89,13 +86,31 @@ const DoctorPortal = () => {
     }
   };
 
+  const previewPDF = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:8000/prescriptions/view/${id}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch PDF');
+
+      const blob = await response.blob();
+      const pdfURL = URL.createObjectURL(blob);
+      window.open(pdfURL, '_blank');
+    } catch (err) {
+      console.error('Preview error:', err);
+      alert('Failed to preview the prescription.');
+    }
+  };
+
   return (
     <Box sx={{ p: 4, fontFamily: 'Poppins', backgroundColor: '#f7f8f9', minHeight: '100vh' }}>
       <Typography variant="h4" sx={{ mb: 4, color: '#121a00', fontWeight: 600 }} align="center">
         Doctor Portal
       </Typography>
 
-      {/* Search Card */}
+      {/* 🔍 Search Section */}
       <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: 4 }}>
         <Typography variant="h6" sx={{ mb: 2, color: '#495d00', fontWeight: 500 }}>
           🔍 Search for a Patient
@@ -135,7 +150,7 @@ const DoctorPortal = () => {
         </Grid>
       </Paper>
 
-     
+      {/* 📤 Upload Section */}
       {searched && (
         <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
           <Typography variant="h6" mb={2} sx={{ color: '#678300' }}>
@@ -182,7 +197,7 @@ const DoctorPortal = () => {
         </Paper>
       )}
 
-      {/* Prescription List */}
+      {/* 📑 Prescription List */}
       {loading ? (
         <Box display="flex" justifyContent="center" mt={4}>
           <CircularProgress />
@@ -209,9 +224,7 @@ const DoctorPortal = () => {
                       textTransform: 'none',
                       '&:hover': { backgroundColor: '#ccff00', borderColor: '#678300' },
                     }}
-                    onClick={() =>
-                      window.open(`http://localhost:8000/prescriptions/view/${pres.id}`, '_blank')
-                    }
+                    onClick={() => previewPDF(pres.id)}
                   >
                     View PDF
                   </Button>
