@@ -20,13 +20,17 @@ app.include_router(inventory.router)
 async def read_health():
     return {"chumma": "🙃"}
 
+@app.get("/")
+async def read_root():
+    return {"Hello": "World"}
+
 app.include_router(prescription.router)
 
 app.include_router(analytics.router)
 app.include_router(pharmacy.router)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Replace with frontend URL
+    allow_origins=["http://localhost:5173","http://192.168.1.9:5173"],  # Replace with frontend URL
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods (POST, GET, etc.)
     allow_headers=["*"],  # Allow all headers
