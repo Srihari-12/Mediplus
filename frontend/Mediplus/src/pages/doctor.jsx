@@ -58,25 +58,30 @@ const DoctorPortal = () => {
       alert('Please select a PDF file and fill in patient details.');
       return;
     }
-
+  
     const formData = new FormData();
     formData.append('file', file);
     formData.append('patient_name', patientName);
     formData.append('patient_user_id', patientId);
-
+  
     try {
       const res = await fetch('http://localhost:8000/prescriptions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-
+  
       const data = await res.json();
-
+  
       if (res.ok) {
         alert('Prescription uploaded successfully!');
         setPrescriptions((prev) => [data, ...prev]);
         setFile(null);
+      } else if (res.status === 422 && data.detail?.low_stock) {
+        const lowStockList = data.detail.low_stock
+          .map((item) => `${item.medicine} (available: ${item.available}, threshold: ${item.threshold})`)
+          .join('\n');
+        alert(`⚠️ Some medicines are low in stock:\n\n${lowStockList}\n\nPlease revise the prescription.`);
       } else {
         alert(data.detail || 'Upload failed');
       }
@@ -85,7 +90,7 @@ const DoctorPortal = () => {
       alert('Something went wrong.');
     }
   };
-
+  
   const previewPDF = async (id) => {
     try {
       const response = await fetch(`http://localhost:8000/prescriptions/view/${id}`, {

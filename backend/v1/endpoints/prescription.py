@@ -7,8 +7,12 @@ from jose import JWTError, jwt
 from util.get_db import get_db
 from model.user_model import User, RoleEnum
 from model.prescription_model import Prescription
+from model.pharmacy_model import PharmacyPrescription
 from schemas.prescription_schema import PrescriptionResponse
+from model.inventory_model import Inventory
+from util.pdf_parser import extract_text_from_pdf, extract_medicine_names
 from util.auth import oauth2_bearer, SECRET_KEY, ALGORITHM
+from fastapi import Request
 
 router = APIRouter(tags=["Prescriptions"], prefix="/prescriptions")
 
@@ -42,6 +46,7 @@ def get_current_patient(token: str = Depends(oauth2_bearer), db: Session = Depen
 
 # ========== ROUTES ==========
 
+
 @router.post("/", response_model=PrescriptionResponse, status_code=status.HTTP_201_CREATED)
 async def upload_prescription(
     patient_name: str = Form(...),
@@ -65,6 +70,30 @@ async def upload_prescription(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
+    # ✅ Extract medicines from PDF
+    extracted_text = extract_text_from_pdf(file_path)
+    medicines = extract_medicine_names(extracted_text)
+
+    # ✅ Check stock levels using Inventory model
+    low_stock = []
+    for med in medicines:
+        stock_item = db.query(Inventory).filter(Inventory.medicine_name.ilike(f"%{med}%")).first()
+        if stock_item and stock_item.quantity < 10:  # Default threshold can be adjusted or made dynamic
+            low_stock.append({
+                "medicine": stock_item.medicine_name,
+                "available": stock_item.quantity,
+                "threshold": 10
+            })
+
+    if low_stock:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Some medicines are below the stock threshold",
+                "low_stock": low_stock
+            }
+        )
+
     # ✅ Save to DB
     new_prescription = Prescription(
         doctor_id=doctor.id,
@@ -76,9 +105,10 @@ async def upload_prescription(
     db.add(new_prescription)
     db.commit()
     db.refresh(new_prescription)
+    print("Parsed Medicines:", medicines)
+
 
     return new_prescription
-
 
 @router.get("/", response_model=list[PrescriptionResponse])
 async def get_prescriptions(
@@ -115,12 +145,25 @@ async def get_prescriptions(
     raise HTTPException(status_code=403, detail="Unauthorized access")
 
 
+
+
 @router.get("/view/{prescription_id}")
 async def view_prescription(
     prescription_id: str,
-    token: str = Depends(oauth2_bearer),
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    # ✅ Read token from either header or query param
+    token = request.headers.get("authorization")
+    if token and token.lower().startswith("bearer "):
+        token = token.split(" ")[1]
+    else:
+        token = request.query_params.get("token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Authorization token missing")
+
+    # ✅ Decode token
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
@@ -128,14 +171,12 @@ async def view_prescription(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid user")
-
-    # ✅ Doctor or Patient can access file (based on ownership)
+    # ✅ Role-based access
     prescription = db.query(Prescription).filter(Prescription.id == prescription_id).first()
-
     if not prescription:
         raise HTTPException(status_code=404, detail="Prescription not found")
+
+    from model.pharmacy_model import PharmacyPrescription
 
     if user.role == RoleEnum.patient and prescription.patient_user_id != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
@@ -143,9 +184,11 @@ async def view_prescription(
     if user.role == RoleEnum.doctor and prescription.doctor_id != user.id:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    file_path = prescription.file_path
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
+    if user.role == RoleEnum.pharmacist:
+        pharmacy_linked = db.query(PharmacyPrescription).filter(
+            PharmacyPrescription.prescription_id == prescription_id
+        ).first()
+        if not pharmacy_linked:
+            raise HTTPException(status_code=403, detail="Pharmacist not authorized for this prescription")
 
-    return FileResponse(file_path, media_type="application/pdf", filename=os.path.basename(file_path))
-
+    return FileResponse(prescription.file_path, media_type="application/pdf", filename="prescription.pdf")

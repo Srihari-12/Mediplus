@@ -15,6 +15,7 @@ import PharmacistPortal from './pages/pharmacist';
 import DoctorPortal from './pages/doctor';
 import HomePage from './pages/home';
 import AdminDashboard from './pages/admin';
+import Footer from './components/footer';
 
 function AppWrapper() {
   const navigate = useNavigate();
@@ -114,6 +115,9 @@ function AppWrapper() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {/* ✅ Always Visible Footer */}
+      <Footer />
     </>
   );
 }
