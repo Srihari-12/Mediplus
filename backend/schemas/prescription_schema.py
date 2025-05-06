@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from enum import Enum
+from enum import Enum 
 from typing import Optional
 
 class OrderStatusEnum(str, Enum):
@@ -25,7 +25,10 @@ class PrescriptionResponse(BaseModel):
     patient_user_id: int
     file_path: str
     created_at: Optional[datetime]
-    
-    class Config:
 
-        from_attributes = True  
+class QueueStatusEnum(str, Enum): 
+    waiting = "waiting"
+    completed = "completed"
+
+    class Config:
+        from_attributes = True

@@ -19,5 +19,5 @@ class Prescription(Base):
     doctor = relationship("User", back_populates="prescriptions_as_doctor", foreign_keys=[doctor_id])
     patient = relationship("User", back_populates="prescriptions_as_patient", foreign_keys=[patient_user_id])
 
-    # ✅ Pharmacy orders relationship
+
     pharmacy_orders = relationship("PharmacyPrescription", back_populates="prescription", cascade="all, delete")

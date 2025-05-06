@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import {
   Box,
@@ -36,6 +37,7 @@ const PharmacistPortal = () => {
         });
         if (res.ok) {
           const data = await res.json();
+          data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
           setPrescriptions(data);
           setFiltered(data);
         }
@@ -60,12 +62,10 @@ const PharmacistPortal = () => {
   const handleVerifyOtp = async () => {
     try {
       const res = await fetch(
-        `http://localhost:8000/pharmacy/confirm-pickup/${otpDialog.id}?otp_code=${otp.trim()}`, // 🔧 Trimmed here!
+        `http://localhost:8000/pharmacy/confirm-pickup/${otpDialog.id}?otp_code=${otp.trim()}`,
         {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       if (res.ok) {
@@ -204,7 +204,6 @@ const PharmacistPortal = () => {
         </Grid>
       )}
 
-      {/* OTP Modal */}
       <Dialog open={otpDialog.open} onClose={() => setOtpDialog({ open: false, id: null })}>
         <DialogTitle sx={{ fontFamily: 'Poppins' }}>Enter OTP</DialogTitle>
         <DialogContent>

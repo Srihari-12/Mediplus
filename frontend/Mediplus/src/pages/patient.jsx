@@ -18,6 +18,7 @@ const PatientPortal = () => {
   const [loading, setLoading] = useState(true);
   const [otpModal, setOtpModal] = useState({ open: false, otp: '' });
   const [paymentModal, setPaymentModal] = useState({ open: false, prescriptionId: null });
+  const [timers, setTimers] = useState({});
 
   const token = localStorage.getItem('token');
 
@@ -60,14 +61,33 @@ const PatientPortal = () => {
       const data = await res.json();
       if (res.ok) {
         setOtpModal({ open: true, otp: data.otp_code });
+        if (data.estimated_wait_time_seconds) {
+          setTimers((prev) => ({
+            ...prev,
+            [id]: parseInt(data.estimated_wait_time_seconds),
+          }));
+        }
       } else {
-        alert(data.detail || 'Failed to send prescription');
+        alert(data.detail?.message || 'Failed to send prescription');
       }
     } catch (err) {
       console.error('Error:', err);
       alert('Something went wrong');
     }
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimers((prevTimers) => {
+        const newTimers = {};
+        for (const key in prevTimers) {
+          newTimers[key] = Math.max(prevTimers[key] - 1, 0);
+        }
+        return newTimers;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const previewPDF = async (id) => {
     try {
@@ -92,6 +112,13 @@ const PatientPortal = () => {
   const handleCloseModal = () => {
     setOtpModal({ open: false, otp: '' });
   };
+
+  const formatTimer = (seconds) => {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m}m ${s}s`;
+  };
+  
 
   if (loading) {
     return (
@@ -136,6 +163,12 @@ const PatientPortal = () => {
                   <Typography variant="body2">
                     <strong>Date:</strong> {new Date(prescription.created_at).toLocaleString()}
                   </Typography>
+
+                  {timers[prescription.id] !== undefined && (
+                    <Typography variant="body2" sx={{ color: '#ff5722', mt: 1 }}>
+                      ⏳ Estimated Wait Time: {formatTimer(timers[prescription.id])}
+                    </Typography>
+                  )}
 
                   <Button
                     variant="outlined"

@@ -1,25 +1,26 @@
 import os
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Form, Query
+import re
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, Form, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
+from jose import jwt, JWTError
+
 from util.get_db import get_db
 from model.user_model import User, RoleEnum
 from model.prescription_model import Prescription
 from model.pharmacy_model import PharmacyPrescription
-from schemas.prescription_schema import PrescriptionResponse
 from model.inventory_model import Inventory
-from util.pdf_parser import extract_text_from_pdf, extract_medicine_names
+from schemas.prescription_schema import PrescriptionResponse
 from util.auth import oauth2_bearer, SECRET_KEY, ALGORITHM
-from fastapi import Request
+from util.pdf_parser import extract_text_from_pdf, clean_extracted_text, extract_medicine_and_qty
+from util.queue_time import estimate_packing_time
 
 router = APIRouter(tags=["Prescriptions"], prefix="/prescriptions")
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ========== AUTH HELPERS ==========
 
 def get_current_doctor(token: str = Depends(oauth2_bearer), db: Session = Depends(get_db)):
     try:
@@ -44,8 +45,6 @@ def get_current_patient(token: str = Depends(oauth2_bearer), db: Session = Depen
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# ========== ROUTES ==========
-
 
 @router.post("/", response_model=PrescriptionResponse, status_code=status.HTTP_201_CREATED)
 async def upload_prescription(
@@ -55,12 +54,10 @@ async def upload_prescription(
     doctor: User = Depends(get_current_doctor),
     db: Session = Depends(get_db)
 ):
-    # ✅ Validate patient
     patient = db.query(User).filter(User.name == patient_name, User.user_id == patient_user_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    # ✅ Validate file
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
@@ -70,31 +67,24 @@ async def upload_prescription(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    # ✅ Extract medicines from PDF
     extracted_text = extract_text_from_pdf(file_path)
-    medicines = extract_medicine_names(extracted_text)
+    cleaned = clean_extracted_text(extracted_text)
+    medicines = extract_medicine_and_qty(cleaned)
 
-    # ✅ Check stock levels using Inventory model
-    low_stock = []
+    if not medicines:
+        raise HTTPException(status_code=400, detail="No valid medicines found in the prescription.")
+
+    matched_names = []
     for med in medicines:
-        stock_item = db.query(Inventory).filter(Inventory.medicine_name.ilike(f"%{med}%")).first()
-        if stock_item and stock_item.quantity < 10:  # Default threshold can be adjusted or made dynamic
-            low_stock.append({
-                "medicine": stock_item.medicine_name,
-                "available": stock_item.quantity,
-                "threshold": 10
-            })
+        name = med["medicine"]
+        qty_str = med.get("quantity", "1")
+        qty = int(re.findall(r"\d+", qty_str)[0]) if re.findall(r"\d+", qty_str) else 1
 
-    if low_stock:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": "Some medicines are below the stock threshold",
-                "low_stock": low_stock
-            }
-        )
+        item = db.query(Inventory).filter(Inventory.medicine_name.ilike(f"%{name}%")).first()
+        if item and item.quantity >= qty:
+            matched_names.append(item.medicine_name)
 
-    # ✅ Save to DB
+    # Save prescription to DB
     new_prescription = Prescription(
         doctor_id=doctor.id,
         doctor_name=doctor.name,
@@ -105,10 +95,20 @@ async def upload_prescription(
     db.add(new_prescription)
     db.commit()
     db.refresh(new_prescription)
-    print("Parsed Medicines:", medicines)
 
+    estimated_time = estimate_packing_time(matched_names)
 
-    return new_prescription
+    return PrescriptionResponse(
+        id=new_prescription.id,
+        doctor_name=new_prescription.doctor_name,
+        patient_name=new_prescription.patient_name,
+        patient_user_id=new_prescription.patient_user_id,
+        file_path=new_prescription.file_path,
+        created_at=new_prescription.created_at,
+        estimated_pickup_time_min=estimated_time,
+        message="Prescription uploaded successfully."
+    )
+
 
 @router.get("/", response_model=list[PrescriptionResponse])
 async def get_prescriptions(
@@ -117,7 +117,6 @@ async def get_prescriptions(
     token: str = Depends(oauth2_bearer),
     db: Session = Depends(get_db)
 ):
-    # ✅ Decode user
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
@@ -125,26 +124,32 @@ async def get_prescriptions(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # ✅ Doctor fetching by name & ID
-    if user and user.role == RoleEnum.doctor:
+    if user.role == RoleEnum.doctor:
         if not name or not user_id:
             raise HTTPException(status_code=400, detail="Patient name and user ID required")
         prescriptions = db.query(Prescription).filter(
             Prescription.patient_name == name,
             Prescription.patient_user_id == user_id
         ).all()
-        return prescriptions
-
-    # ✅ Patient fetching their own
-    if user and user.role == RoleEnum.patient:
+    elif user.role == RoleEnum.patient:
         prescriptions = db.query(Prescription).filter(
             Prescription.patient_user_id == user.user_id
         ).all()
-        return prescriptions
+    else:
+        raise HTTPException(status_code=403, detail="Unauthorized access")
 
-    raise HTTPException(status_code=403, detail="Unauthorized access")
-
-
+    return [
+        PrescriptionResponse(
+            id=p.id,
+            doctor_name=p.doctor_name,
+            patient_name=p.patient_name,
+            patient_user_id=p.patient_user_id,
+            file_path=p.file_path,
+            created_at=p.created_at,
+            estimated_pickup_time_min=0,
+            message="Loaded"
+        ) for p in prescriptions
+    ]
 
 
 @router.get("/view/{prescription_id}")
@@ -153,7 +158,6 @@ async def view_prescription(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    # ✅ Read token from either header or query param
     token = request.headers.get("authorization")
     if token and token.lower().startswith("bearer "):
         token = token.split(" ")[1]
@@ -163,7 +167,6 @@ async def view_prescription(
     if not token:
         raise HTTPException(status_code=401, detail="Authorization token missing")
 
-    # ✅ Decode token
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
@@ -171,12 +174,9 @@ async def view_prescription(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # ✅ Role-based access
     prescription = db.query(Prescription).filter(Prescription.id == prescription_id).first()
     if not prescription:
         raise HTTPException(status_code=404, detail="Prescription not found")
-
-    from model.pharmacy_model import PharmacyPrescription
 
     if user.role == RoleEnum.patient and prescription.patient_user_id != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
@@ -185,10 +185,10 @@ async def view_prescription(
         raise HTTPException(status_code=403, detail="Access denied")
 
     if user.role == RoleEnum.pharmacist:
-        pharmacy_linked = db.query(PharmacyPrescription).filter(
+        linked = db.query(PharmacyPrescription).filter(
             PharmacyPrescription.prescription_id == prescription_id
         ).first()
-        if not pharmacy_linked:
-            raise HTTPException(status_code=403, detail="Pharmacist not authorized for this prescription")
+        if not linked:
+            raise HTTPException(status_code=403, detail="Pharmacist not authorized")
 
     return FileResponse(prescription.file_path, media_type="application/pdf", filename="prescription.pdf")
