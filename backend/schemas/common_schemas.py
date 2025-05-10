@@ -17,3 +17,8 @@ class LogoutResponse(BaseModel):
     detail: str
     last_login: datetime
 
+
+
+
+class PromptRequest(BaseModel):
+    prompt: str

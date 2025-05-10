@@ -15,11 +15,10 @@ class UserBase(BaseModel):
     verified: bool = False
     created_at: datetime = datetime.now()
 
-# Schema for user creation
+
 class UserCreate(UserBase):
     pass
 
-# Schema for updating user details
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
@@ -30,15 +29,13 @@ class UserUpdate(BaseModel):
     verified: Optional[bool] = None
     created_at: Optional[datetime] = None
 
-# Schema for user response
 class UserResponse(UserBase):
     id: str  # UUID
     created_at: datetime
 
     class Config:
-        orm_mode = True  # Enables ORM support for SQLAlchemy models
+        orm_mode = True
 
-# Schema for authentication token
 class Token(BaseModel):
     access_token: str
     token_type: str

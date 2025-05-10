@@ -25,10 +25,8 @@ class PrescriptionResponse(BaseModel):
     patient_user_id: int
     file_path: str
     created_at: Optional[datetime]
-
-class QueueStatusEnum(str, Enum): 
-    waiting = "waiting"
-    completed = "completed"
-
+    estimated_pickup_time_min: float
+    message: str
+    remarks: Optional[str] = None  
     class Config:
         from_attributes = True

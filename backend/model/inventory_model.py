@@ -6,7 +6,9 @@ class Inventory(Base):
     __tablename__ = "inventory"
 
     id = Column(Integer, primary_key=True, index=True)
-    medicine_name = Column(String(100), nullable=False)  
+    medicine_name = Column(String(100), nullable=False)
     quantity = Column(Integer, nullable=False)
-    unit = Column(String(20), default="units")            
+    unit = Column(String(20), default="units")
+    threshold = Column(Integer, default=10)  # ✅ Add this line
+
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

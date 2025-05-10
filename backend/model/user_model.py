@@ -50,4 +50,4 @@ def generate_user_id(db):
     last_user = db.query(User).order_by(User.user_id.desc()).first()
     if last_user and last_user.user_id < 999:
         return last_user.user_id + 1
-    return 100  # Start from 100 if no users exist
+    return 100  

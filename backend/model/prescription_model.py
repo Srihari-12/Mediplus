@@ -1,9 +1,10 @@
-
 from sqlalchemy import Column, String, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from config.db import Base
-import uuid
 from datetime import datetime
+import uuid
+
+from config.base import Base
+
 
 class Prescription(Base):
     __tablename__ = "prescriptions"
@@ -16,8 +17,8 @@ class Prescription(Base):
     file_path = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    remarks = Column(String(100), nullable=True)
+
     doctor = relationship("User", back_populates="prescriptions_as_doctor", foreign_keys=[doctor_id])
     patient = relationship("User", back_populates="prescriptions_as_patient", foreign_keys=[patient_user_id])
-
-
     pharmacy_orders = relationship("PharmacyPrescription", back_populates="prescription", cascade="all, delete")

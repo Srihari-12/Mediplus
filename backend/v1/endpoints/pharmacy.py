@@ -16,7 +16,7 @@ from model.prescription_model import Prescription
 from model.pharmacy_model import PharmacyPrescription, OrderStatusEnum
 from model.inventory_model import Inventory
 from util.pdf_parser import extract_text_from_pdf, clean_extracted_text, extract_medicine_and_qty
-from util.queue_time import estimate_packing_time
+from util.queue_manager import add_to_queue, remove_from_queue  # Updated imports
 
 router = APIRouter(tags=["Pharmacy"], prefix="/pharmacy")
 
@@ -99,7 +99,16 @@ async def send_prescription_to_pharmacy(
     for stock, qty in inventory_updates:
         stock.quantity -= qty
 
-    estimated_time = estimate_packing_time(matched_names)
+    # Assign type to each matched medicine and queue it
+    medicines_payload = [
+        {
+            "name": name,
+            "type": "edge" if "syrup" in name.lower() or "injection" in name.lower() else "regular"
+        }
+        for name in matched_names
+    ]
+    queue_id, estimated_time = add_to_queue(prescription.id, medicines_payload)
+
     otp_code = generate_otp()
 
     record = PharmacyPrescription(
@@ -115,14 +124,12 @@ async def send_prescription_to_pharmacy(
     db.commit()
     db.refresh(record)
 
-    print(f"TIME ESTIMATION 😀😀: {estimated_time} seconds")
-
     return {
         "message": "Prescription sent to pharmacy",
         "otp_code": record.otp_code,
-        "estimated_wait_time_seconds": estimated_time
+        "estimated_wait_time_seconds": estimated_time,
+        "queue_id": queue_id
     }
-
 
 
 @router.post("/mark-preparing/{prescription_id}")
@@ -164,6 +171,9 @@ async def confirm_pickup(
     record.status = OrderStatusEnum.picked_up
     record.updated_at = datetime.utcnow()
     db.commit()
+
+    # Remove from Redis queue
+    remove_from_queue(prescription_id)
 
     return {"message": "Prescription successfully picked up"}
 

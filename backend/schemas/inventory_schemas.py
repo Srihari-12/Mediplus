@@ -1,13 +1,15 @@
 from pydantic import BaseModel
 from datetime import datetime
 
-# ✅ Define InventoryBase first
+
 class InventoryBase(BaseModel):
     medicine_name: str
     quantity: int
     unit: str = "units"
+    threshold: int = 10 
 
-# ✅ Then define the other schemas that inherit from it
+
+
 class InventoryCreate(InventoryBase):
     pass
 

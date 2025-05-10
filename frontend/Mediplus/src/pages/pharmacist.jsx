@@ -1,27 +1,15 @@
-
+// PharmacistPortal.jsx — Enhanced UI with filters, queue, status actions
 import React, { useEffect, useState } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  Button,
-  Grid,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  ToggleButtonGroup,
-  ToggleButton,
-  Chip
+  Box, Typography, Paper, Button, CircularProgress, Dialog,
+  DialogTitle, DialogContent, DialogActions, TextField, Chip, Fade, ToggleButtonGroup, ToggleButton
 } from '@mui/material';
-import LockIcon from '@mui/icons-material/Lock';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import LockIcon from '@mui/icons-material/Lock';
 
 const PharmacistPortal = () => {
-  const [prescriptions, setPrescriptions] = useState([]);
+  const [queue, setQueue] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -29,53 +17,55 @@ const PharmacistPortal = () => {
   const [otp, setOtp] = useState('');
   const token = localStorage.getItem('token');
 
+  const fetchQueue = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/queue', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setQueue(data);
+      if (statusFilter === 'all') setFiltered(data);
+      else setFiltered(data.filter(q => q.status === statusFilter));
+    } catch (err) {
+      console.error('Queue Fetch Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchPrescriptions = async () => {
-      try {
-        const res = await fetch('http://localhost:8000/pharmacy/list', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-          setPrescriptions(data);
-          setFiltered(data);
-        }
-      } catch (error) {
-        console.error('Error fetching prescriptions:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPrescriptions();
+    fetchQueue();
+    const interval = setInterval(fetchQueue, 5000); // Auto-refresh every 5s
+    return () => clearInterval(interval);
   }, [token]);
 
   const handleFilterChange = (_, newStatus) => {
     setStatusFilter(newStatus);
-    if (newStatus === 'all') {
-      setFiltered(prescriptions);
-    } else {
-      setFiltered(prescriptions.filter(p => p.status === newStatus));
+    if (newStatus === 'all') setFiltered(queue);
+    else setFiltered(queue.filter(q => q.status === newStatus));
+  };
+
+  const handleMarkPreparing = async (prescriptionId) => {
+    try {
+      const res = await fetch(`http://localhost:8000/pharmacy/mark-preparing/${prescriptionId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) fetchQueue();
+    } catch (err) {
+      console.error('Error updating status:', err);
     }
   };
 
   const handleVerifyOtp = async () => {
     try {
-      const res = await fetch(
-        `http://localhost:8000/pharmacy/confirm-pickup/${otpDialog.id}?otp_code=${otp.trim()}`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await fetch(`http://localhost:8000/pharmacy/confirm-pickup/${otpDialog.id}?otp_code=${otp.trim()}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         alert('✅ OTP Verified. Status updated to Picked Up.');
-        setPrescriptions(prev =>
-          prev.map(p => p.prescription_id === otpDialog.id ? { ...p, status: 'picked_up' } : p)
-        );
-        setFiltered(prev =>
-          prev.map(p => p.prescription_id === otpDialog.id ? { ...p, status: 'picked_up' } : p)
-        );
+        fetchQueue();
       } else {
         const data = await res.json();
         alert(`❌ ${data.detail || 'Invalid OTP.'}`);
@@ -88,34 +78,15 @@ const PharmacistPortal = () => {
     }
   };
 
-  const handleMarkPreparing = async (prescriptionId) => {
-    try {
-      const res = await fetch(`http://localhost:8000/pharmacy/mark-preparing/${prescriptionId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setPrescriptions(prev =>
-          prev.map(p => p.prescription_id === prescriptionId ? { ...p, status: 'preparing' } : p)
-        );
-        setFiltered(prev =>
-          prev.map(p => p.prescription_id === prescriptionId ? { ...p, status: 'preparing' } : p)
-        );
-      }
-    } catch (err) {
-      console.error('Error updating status:', err);
-    }
-  };
-
   const openPDF = (id) => {
-    const pdfURL = `http://localhost:8000/prescriptions/view/${id}?token=${token}`;
-    window.open(pdfURL, '_blank');
+    const url = `http://localhost:8000/prescriptions/view/${id}?token=${token}`;
+    window.open(url, '_blank');
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#f7f8f9', p: 4, fontFamily: 'Poppins' }}>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#f5f5f5', p: 4, fontFamily: 'Poppins' }}>
       <Typography variant="h4" align="center" mb={4} sx={{ color: '#121a00', fontWeight: 600 }}>
-        Pharmacist Portal
+        👩‍⚕️ Pharmacist Queue
       </Typography>
 
       <ToggleButtonGroup
@@ -123,7 +94,7 @@ const PharmacistPortal = () => {
         value={statusFilter}
         exclusive
         onChange={handleFilterChange}
-        sx={{ mb: 4, justifyContent: 'center', width: '100%' }}
+        sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}
       >
         <ToggleButton value="all">All</ToggleButton>
         <ToggleButton value="pending">Pending</ToggleButton>
@@ -135,77 +106,39 @@ const PharmacistPortal = () => {
         <Box display="flex" justifyContent="center" mt={8}>
           <CircularProgress />
         </Box>
+      ) : filtered.length === 0 ? (
+        <Typography align="center">No prescriptions in this category.</Typography>
       ) : (
-        <Grid container spacing={3}>
-          {filtered.length === 0 ? (
-            <Typography textAlign="center" width="100%">No prescriptions found.</Typography>
-          ) : (
-            filtered.map((p) => (
-              <Grid item xs={12} sm={6} md={4} key={p.id}>
-                <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
-                  <Typography fontWeight={600}>Patient: {p.patient_name}</Typography>
-                  <Typography variant="body2">Doctor: {p.doctor_name}</Typography>
-                  <Typography variant="body2">Date: {p.created_at}</Typography>
-                  <Chip
-                    label={p.status.replace('_', ' ').toUpperCase()}
-                    color={
-                      p.status === 'picked_up' ? 'success' :
-                      p.status === 'preparing' ? 'info' : 'warning'
-                    }
-                    sx={{ mt: 1 }}
-                  />
-
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    sx={{
-                      mt: 2,
-                      borderColor: '#678300',
-                      color: '#678300',
-                      textTransform: 'none',
-                      '&:hover': {
-                        backgroundColor: '#ccff00',
-                        borderColor: '#678300'
-                      },
-                    }}
-                    onClick={() => openPDF(p.prescription_id)}
-                    startIcon={<VisibilityIcon />}
-                  >
-                    View PDF
-                  </Button>
-
-                  {p.status === 'pending' && (
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      sx={{ mt: 1.5, backgroundColor: '#2c3a00' }}
-                      startIcon={<LocalShippingIcon />}
-                      onClick={() => handleMarkPreparing(p.prescription_id)}
-                    >
-                      Mark as Preparing
-                    </Button>
-                  )}
-
-                  {p.status === 'preparing' && (
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      sx={{ mt: 1.5, backgroundColor: '#121a00' }}
-                      startIcon={<LockIcon />}
-                      onClick={() => setOtpDialog({ open: true, id: p.prescription_id })}
-                    >
-                      Verify OTP (Pickup)
-                    </Button>
-                  )}
-                </Paper>
-              </Grid>
-            ))
-          )}
-        </Grid>
+        filtered.map((item, index) => (
+          <Fade in={true} timeout={500} key={item.queue_id}>
+            <Paper elevation={4} sx={{ mb: 3, p: 3, borderRadius: 3 }}>
+              <Typography variant="body1">
+                <strong>#{index + 1}</strong> - RxID: {item.prescription_id.slice(0, 8)}...
+              </Typography>
+              <Typography variant="body2">⏱ ETA: {item.est_time}s</Typography>
+              <Box mt={1}>
+                {item.medicines.map((med, i) => (
+                  <Chip key={i} label={`${med.name} (${med.type})`} sx={{ mr: 1, mb: 1 }} />
+                ))}
+              </Box>
+              <Box display="flex" gap={2} mt={2} flexWrap="wrap">
+                <Button variant="outlined" startIcon={<VisibilityIcon />} onClick={() => openPDF(item.prescription_id)}>
+                  View PDF
+                </Button>
+                <Button variant="contained" sx={{ backgroundColor: '#678300' }} startIcon={<LocalShippingIcon />} onClick={() => handleMarkPreparing(item.prescription_id)}>
+                  Mark as Preparing
+                </Button>
+                <Button variant="contained" sx={{ backgroundColor: '#121a00' }} startIcon={<LockIcon />} onClick={() => setOtpDialog({ open: true, id: item.prescription_id })}>
+                  Verify OTP
+                </Button>
+              </Box>
+            </Paper>
+          </Fade>
+        ))
       )}
 
       <Dialog open={otpDialog.open} onClose={() => setOtpDialog({ open: false, id: null })}>
-        <DialogTitle sx={{ fontFamily: 'Poppins' }}>Enter OTP</DialogTitle>
+        <DialogTitle>Enter OTP</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus

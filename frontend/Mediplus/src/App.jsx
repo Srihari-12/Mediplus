@@ -10,6 +10,7 @@ import Navbar from './components/Navbar';
 import Login from './pages/login';
 import Signup from './pages/signup';
 import Profile from './pages/profile';
+import ChatBot from './pages/chatbot';
 import PatientPortal from './pages/patient';
 import PharmacistPortal from './pages/pharmacist'; 
 import DoctorPortal from './pages/doctor';
@@ -97,7 +98,10 @@ function AppWrapper() {
         )}
 
         {isLoggedIn && user?.role === 'patient' && (
-          <Route path="/patient" element={<PatientPortal />} />
+          <>
+            <Route path="/patient" element={<PatientPortal />} />
+            <Route path="/chatbot" element={<ChatBot />} />
+          </>
         )}
 
         {isLoggedIn && user?.role === 'pharmacist' && (
