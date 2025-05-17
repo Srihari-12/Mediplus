@@ -10,6 +10,7 @@ MediPlus is a digital prescription management system that enables doctors to upl
 - Table extraction from PDFs using AI for inventory validation
 - Pharmacy module with OTP-based pickup confirmation
 - Real-time inventory tracking and analytics
+- Chat bot assistance for patient to for any quick queries
 - Admin dashboard for managing medicine stock
 
 ## Tech Stack
